@@ -1,0 +1,66 @@
+{
+  "id": "iphone_11_pro_max",
+  "name": "iPhone 11 Pro Max",
+  "apple_part_numbers": ["616-00651", "616-00653"],
+  "cell_model": "1ICP5/110/64",
+  "capacity_mah": 3969,
+  "nominal_voltage": 3.79,
+  "energy_wh": 15.04,
+  "weight_g": 59.6,
+
+  "_units": "all lengths in millimetres; XY = front view (label side), origin = bottom-left of the bounding box, Z = thickness towards the viewer",
+
+  "thickness": 4.6,
+  "outline": {
+    "type": "L",
+    "width": 64.6,
+    "height": 109.0,
+    "upper_width": 38.6,
+    "lower_height": 43.5,
+    "outer_radius": 1.6,
+    "inner_radius": 3.5
+  },
+  "edge_bevel": { "offset": 1.1, "segments": 5 },
+
+  "print_zones": {
+    "_note": "for texturing only, no geometry: darker seal band of the pouch under the label",
+    "seal_band_top_mm": 3.0,
+    "seal_band_bottom_mm": 0.0
+  },
+
+  "flex_thickness": 0.2,
+  "flex_z": "mid",
+  "stiffener_thickness": 0.3,
+  "connector_side": "back",
+
+  "flexes": [
+    {
+      "name": "Flex_Main",
+      "_note": "main battery flex, exits the L inner corner, runs along the step edge then turns up to the logic-board plug",
+      "polygon": [
+        [38.0, 42.0], [50.5, 42.0], [50.5, 52.0], [51.5, 52.0], [51.5, 57.5],
+        [45.5, 57.5], [45.5, 52.0], [46.5, 52.0], [46.5, 46.0], [38.0, 46.0]
+      ],
+      "fillets": [0, 0.6, 0.3, 0.4, 0.8, 0.8, 0.4, 0.3, 0.6, 0],
+      "stiffener": [45.5, 52.0, 51.5, 57.5],
+      "connector": { "name": "Connector_Main", "center": [48.5, 54.75], "size": [4.2, 2.8, 0.6], "rotation_deg": 0, "pins_per_row": 4, "power_pads": true }
+    },
+    {
+      "name": "Flex_Lower",
+      "_note": "second flex at the charging-port end, plugs into the interconnect board (wireless charging coil)",
+      "polygon": [
+        [30.0, 1.5], [30.0, -4.0], [35.5, -4.0], [35.5, -9.5], [41.0, -9.5],
+        [41.0, -4.0], [38.5, -4.0], [38.5, -1.2], [33.5, -1.2], [33.5, 1.5]
+      ],
+      "fillets": [0, 0.6, 0.3, 0.8, 0.8, 0.4, 0.3, 0.3, 0.6, 0],
+      "stiffener": [35.5, -9.5, 41.0, -4.0],
+      "connector": { "name": "Connector_Lower", "center": [38.25, -6.75], "size": [4.2, 2.8, 0.6], "rotation_deg": 0, "pins_per_row": 4, "power_pads": true }
+    }
+  ],
+
+  "sources": [
+    "Vendor print proof (W001105, 11pro max-D): label 109 x 64.6 mm, upper part 38.6 mm wide, lower part 43.5 mm high, tolerance +-3 mm",
+    "iFixit iPhone 11 Pro Max Teardown step 14: thickness 4.6 mm, 23.8 cm3, 59.6 g, 3969 mAh / 3.79 V / 15.04 Wh, two connectors",
+    "iFixit battery replacement guide 128034: main connector on logic board at the inner corner, lower connector on the interconnect board near the Taptic Engine"
+  ]
+}
