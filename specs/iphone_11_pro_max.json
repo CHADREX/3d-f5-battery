@@ -1,0 +1,264 @@
+{
+  "id": "iphone_11_pro_max",
+  "name": "iPhone 11 Pro Max",
+  "apple_part_numbers": [
+    "616-00651",
+    "616-00653"
+  ],
+  "cell_model": "1ICP5/110/64",
+  "capacity_mah": 3969,
+  "nominal_voltage": 3.79,
+  "energy_wh": 15.04,
+  "weight_g": 59.6,
+  "_units": "all lengths in millimetres; XY = front view (label side), origin = bottom-left of the bounding box, Z = thickness towards the viewer",
+  "thickness": 4.6,
+  "outline": {
+    "type": "L",
+    "width": 64.6,
+    "height": 109.0,
+    "upper_width": 38.6,
+    "lower_height": 43.5,
+    "outer_radius": 1.6,
+    "inner_radius": 2.0
+  },
+  "edge_bevel": {
+    "offset": 1.1,
+    "segments": 5
+  },
+  "print_zones": {
+    "_note": "for texturing only, no geometry: darker seal band of the pouch under the label",
+    "seal_band_top_mm": 3.0,
+    "seal_band_bottom_mm": 0.0
+  },
+  "flex_thickness": 0.12,
+  "flex_z": 2.5,
+  "stiffener_thickness": 0.3,
+  "connector_side": "back",
+  "flexes": [
+    {
+      "name": "Flex_Main",
+      "spline": true,
+      "_note": "thin strip (~0.5 mm) out of the step seal at the inner corner: hairpin loop opening to the right, then diagonal up-right into the black tab; points = [x, y, z, width]",
+      "thickness": 0.12,
+      "points": [
+        [
+          42.1,
+          43.35,
+          2.56,
+          0.5
+        ],
+        [
+          41.1,
+          43.45,
+          2.56,
+          0.5
+        ],
+        [
+          40.3,
+          43.95,
+          2.57,
+          0.5
+        ],
+        [
+          40.7,
+          44.55,
+          2.58,
+          0.5
+        ],
+        [
+          41.6,
+          44.7,
+          2.6,
+          0.5
+        ],
+        [
+          42.6,
+          45.0,
+          2.63,
+          0.6
+        ],
+        [
+          43.4,
+          45.5,
+          2.68,
+          0.9
+        ],
+        [
+          43.9,
+          46.0,
+          2.7,
+          1.2
+        ]
+      ],
+      "tab": {
+        "center": [
+          43.35,
+          46.25
+        ],
+        "size": [
+          4.1,
+          3.1
+        ],
+        "radius": 0.5,
+        "rotation_deg": 10,
+        "z": 2.7,
+        "thickness": 0.22
+      },
+      "connector": {
+        "name": "Connector_Main",
+        "center": [
+          43.1,
+          46.5
+        ],
+        "size": [
+          3.4,
+          2.2,
+          0.5
+        ],
+        "rotation_deg": 10,
+        "pins_per_row": 5,
+        "power_pads": true
+      }
+    },
+    {
+      "name": "Flex_Lower",
+      "spline": true,
+      "_note": "thin strip out of the bottom seal ~33 mm from the left: hairpin loop opening to the right, short run right just under the edge, into the black tab",
+      "thickness": 0.12,
+      "points": [
+        [
+          33.3,
+          0.35,
+          2.56,
+          0.45
+        ],
+        [
+          33.05,
+          -0.5,
+          2.56,
+          0.45
+        ],
+        [
+          32.45,
+          -1.15,
+          2.57,
+          0.45
+        ],
+        [
+          32.75,
+          -1.8,
+          2.58,
+          0.45
+        ],
+        [
+          33.6,
+          -1.75,
+          2.6,
+          0.45
+        ],
+        [
+          34.7,
+          -1.55,
+          2.63,
+          0.5
+        ],
+        [
+          35.6,
+          -1.5,
+          2.67,
+          0.8
+        ],
+        [
+          36.2,
+          -1.75,
+          2.7,
+          1.1
+        ]
+      ],
+      "tab": {
+        "center": [
+          36.9,
+          -2.5
+        ],
+        "size": [
+          3.8,
+          3.1
+        ],
+        "radius": 0.5,
+        "rotation_deg": -3,
+        "z": 2.7,
+        "thickness": 0.22
+      },
+      "connector": {
+        "name": "Connector_Lower",
+        "center": [
+          36.8,
+          -2.45
+        ],
+        "size": [
+          3.4,
+          2.2,
+          0.5
+        ],
+        "rotation_deg": -3,
+        "pins_per_row": 5,
+        "power_pads": true
+      }
+    }
+  ],
+  "sources": [
+    "Vendor print proof (W001105, 11pro max-D): label 109 x 64.6 mm, upper part 38.6 mm wide, lower part 43.5 mm high, tolerance +-3 mm",
+    "iFixit iPhone 11 Pro Max Teardown step 14: thickness 4.6 mm, 23.8 cm3, 59.6 g, 3969 mAh / 3.79 V / 15.04 Wh, two connectors",
+    "iFixit battery replacement guide 128034: main connector on logic board at the inner corner, lower connector on the interconnect board near the Taptic Engine"
+  ],
+  "seal_thickness": 0.3,
+  "seal_lips": [
+    {
+      "name": "Seal_Step",
+      "_note": "flat laminate seal along the L step edge; the main flex comes out of it",
+      "rect": [
+        38.9,
+        43.3,
+        63.9,
+        44.6
+      ]
+    },
+    {
+      "name": "Seal_Bottom",
+      "_note": "flat laminate seal along the bottom edge; the lower flex comes out of it",
+      "rect": [
+        0.7,
+        -1.1,
+        63.9,
+        0.4
+      ]
+    },
+    {
+      "name": "Seal_Top",
+      "_note": "thin seal lip on the top edge of the narrow part",
+      "rect": [
+        0.7,
+        108.6,
+        37.9,
+        109.9
+      ]
+    }
+  ],
+  "side_wraps": [
+    {
+      "name": "Side_Wrap",
+      "_note": "taped side-seal fold along the outer edge of the wide part: dark rounded rib ~4 mm wide (the 'бортик')",
+      "rect": [
+        60.6,
+        0.3,
+        64.8,
+        43.2
+      ],
+      "extra_thickness": 0.25,
+      "bevel": {
+        "offset": 1.3,
+        "segments": 5
+      }
+    }
+  ]
+}
