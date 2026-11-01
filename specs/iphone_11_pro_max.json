@@ -30,94 +30,71 @@
     "seal_band_top_mm": 3.0,
     "seal_band_bottom_mm": 0.0
   },
-  "flex_thickness": 0.2,
-  "flex_z": 2.55,
+  "flex_thickness": 0.15,
+  "flex_z": 2.5,
   "stiffener_thickness": 0.3,
-  "connector_side": "front",
+  "connector_side": "back",
   "flexes": [
     {
       "name": "Flex_Main",
-      "_note": "main battery flex: short tab out of the step seal right next to the inner corner, plug 3-5 mm above the step",
-      "polygon": [
+      "_note": "thin strip out of the step seal at the inner corner: U-shaped strain-relief loop, short run right along the step, then up to the plug pad",
+      "width": 1.3,
+      "path": [
         [
-          40.5,
-          43.4
+          39.6,
+          43.0
         ],
         [
-          46.5,
-          43.4
+          39.6,
+          46.6
         ],
         [
-          46.5,
-          46.2
+          41.9,
+          46.6
         ],
         [
-          45.2,
-          46.2
+          41.9,
+          44.8
         ],
         [
-          45.2,
-          48.5
+          45.6,
+          44.8
         ],
         [
-          46.5,
-          48.5
-        ],
-        [
-          46.5,
-          54.0
-        ],
-        [
-          40.5,
-          54.0
-        ],
-        [
-          40.5,
-          48.5
-        ],
-        [
-          41.8,
-          48.5
-        ],
-        [
-          41.8,
-          46.2
-        ],
-        [
-          40.5,
-          46.2
+          45.6,
+          49.3
         ]
       ],
-      "fillets": [
+      "radii": [
         0,
-        0.6,
-        0.5,
-        0.3,
-        0.3,
-        0.4,
-        0.8,
-        0.8,
-        0.4,
-        0.3,
-        0.3,
-        0.5
+        1.0,
+        0.9,
+        0.9,
+        1.0,
+        0
       ],
-      "stiffener": [
-        40.5,
-        48.5,
-        46.5,
-        54.0
-      ],
+      "pad": {
+        "center": [
+          45.6,
+          50.9
+        ],
+        "size": [
+          3.3,
+          3.7
+        ],
+        "radius": 0.5,
+        "rotation_deg": 0
+      },
       "connector": {
         "name": "Connector_Main",
         "center": [
-          43.5,
-          51.25
+          45.6,
+          50.9
         ],
         "size": [
-          4.0,
-          2.6,
-          0.6
+          3.1,
+          2.5,
+          0.5
         ],
         "rotation_deg": 90,
         "pins_per_row": 4,
@@ -126,77 +103,64 @@
     },
     {
       "name": "Flex_Lower",
-      "_note": "second flex at the charging-port end, plugs into the interconnect board (wireless charging coil)",
-      "polygon": [
+      "_note": "thin strip out of the bottom seal: J-loop, short run right under the edge, plug pad hanging below",
+      "width": 1.3,
+      "path": [
         [
-          30.0,
-          0.4
+          32.4,
+          0.8
         ],
         [
-          30.0,
-          -4.0
+          32.4,
+          -2.8
         ],
         [
-          35.5,
-          -4.0
+          34.4,
+          -2.8
         ],
         [
-          35.5,
-          -9.5
+          34.4,
+          -1.4
         ],
         [
-          41.0,
-          -9.5
+          38.3,
+          -1.4
         ],
         [
-          41.0,
-          -4.0
-        ],
-        [
-          38.5,
-          -4.0
-        ],
-        [
-          38.5,
-          -1.2
-        ],
-        [
-          33.5,
-          -1.2
-        ],
-        [
-          33.5,
-          0.4
+          38.3,
+          -2.4
         ]
       ],
-      "fillets": [
+      "radii": [
         0,
-        0.6,
-        0.3,
-        0.8,
-        0.8,
-        0.4,
-        0.3,
-        0.3,
-        0.6,
+        1.0,
+        0.9,
+        0.9,
+        0.9,
         0
       ],
-      "stiffener": [
-        35.5,
-        -9.5,
-        41.0,
-        -4.0
-      ],
-      "connector": {
-        "name": "Connector_Lower",
+      "pad": {
         "center": [
-          38.25,
-          -6.75
+          38.3,
+          -3.9
         ],
         "size": [
           4.0,
-          2.6,
-          0.6
+          3.2
+        ],
+        "radius": 0.5,
+        "rotation_deg": 0
+      },
+      "connector": {
+        "name": "Connector_Lower",
+        "center": [
+          38.3,
+          -3.9
+        ],
+        "size": [
+          3.3,
+          2.5,
+          0.5
         ],
         "rotation_deg": 0,
         "pins_per_row": 4,
@@ -215,10 +179,10 @@
       "name": "Seal_Step",
       "_note": "flat laminate seal along the L step edge; the main flex comes out of it",
       "rect": [
-        41.3,
-        43.2,
+        41.0,
+        43.3,
         63.9,
-        45.6
+        44.9
       ]
     },
     {
@@ -226,7 +190,7 @@
       "_note": "flat laminate seal along the bottom edge; the lower flex comes out of it",
       "rect": [
         0.7,
-        -1.9,
+        -1.3,
         63.9,
         0.4
       ]
@@ -238,7 +202,7 @@
         0.7,
         108.6,
         37.9,
-        110.1
+        109.9
       ]
     }
   ],

@@ -370,8 +370,59 @@ def build_side_wraps(spec, mats):
     return objs
 
 
+def fillet_polyline(pts, radii, seg_per_90=8):
+    """Round the interior corners of an OPEN polyline (first/last points are kept)."""
+    if len(pts) < 3:
+        return [tuple(p) for p in pts]
+    closed = fillet_polygon(list(pts), [0] + list(radii[1:-1]) + [0], seg_per_90)
+    # fillet_polygon treats the list as closed; the first and last points have radius 0 so the
+    # only spurious effect is the closing edge, which does not add points. Return as is.
+    return closed
+
+
+def ribbon_polygon(path, radii, width, seg_per_90=8):
+    """Closed outline (CCW) of a flat strip of `width` following an open centreline."""
+    c = fillet_polyline(path, radii, seg_per_90)
+    pts = [Vector(p) for p in c]
+    n = len(pts)
+    left, right = [], []
+    for i in range(n):
+        if i == 0:
+            t = (pts[1] - pts[0]).normalized()
+        elif i == n - 1:
+            t = (pts[-1] - pts[-2]).normalized()
+        else:
+            t1 = (pts[i] - pts[i - 1]).normalized()
+            t2 = (pts[i + 1] - pts[i]).normalized()
+            t = (t1 + t2)
+            t = t.normalized() if t.length > 1e-6 else t1
+            # widen at the corner so the strip keeps its width (miter)
+        nrm = Vector((-t.y, t.x))
+        k = 1.0
+        if 0 < i < n - 1:
+            cos_half = max(0.2, abs(nrm.dot(Vector((-t1.y, t1.x)))))
+            k = 1.0 / cos_half
+        left.append(pts[i] + nrm * (width / 2.0) * k)
+        right.append(pts[i] - nrm * (width / 2.0) * k)
+    poly = [(p.x, p.y) for p in left] + [(p.x, p.y) for p in reversed(right)]
+    if poly_area(poly) < 0:
+        poly.reverse()
+    return poly
+
+
+def rounded_rect(cx, cy, w, h, r, rot_deg=0.0):
+    pts = [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)]
+    poly = fillet_polygon(pts, [min(r, w / 2 - 0.01, h / 2 - 0.01)] * 4)
+    a = math.radians(rot_deg)
+    ca, sa = math.cos(a), math.sin(a)
+    return [(cx + x * ca - y * sa, cy + x * sa + y * ca) for x, y in poly]
+
+
 def build_flex(spec, fx, mats):
-    poly = fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
+    if "path" in fx:
+        poly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2))
+    else:
+        poly = fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
     if poly_area(poly) < 0:
         poly.reverse()
     t = spec.get("flex_thickness", 0.2)
@@ -387,9 +438,24 @@ def build_flex(spec, fx, mats):
     ob = new_object(fx["name"], bm, [mats["Flex"]])
     mark_sharp_edges(ob.data, 35.0)
 
-    # stiffener plate on the side opposite to the connector
-    st = fx.get("stiffener")
     objs = [ob]
+    # connector pad: polyimide tab at the end of the strip, slightly larger than the plug
+    pad = fx.get("pad")
+    if pad:
+        pcx, pcy = pad["center"]
+        pw, ph = pad["size"]
+        ppoly = rounded_rect(pcx, pcy, pw, ph, pad.get("radius", 0.5), pad.get("rotation_deg", 0))
+        bm = bmesh.new()
+        prism(bm, ppoly, z0, z1 + 0.05)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        uv = bm.loops.layers.uv.new("UVMap")
+        planar_uv(bm, uv, list(bm.faces), poly_bbox(ppoly))
+        po = new_object(fx["name"].replace("Flex", "Pad"), bm, [mats["Stiffener"]])
+        mark_sharp_edges(po.data, 35.0)
+        objs.append(po)
+        z1 = z1 + 0.05
+    # stiffener plate on the side opposite to the connector (legacy, optional)
+    st = fx.get("stiffener")
     if st:
         sx0, sy0, sx1, sy1 = st
         ts = spec.get("stiffener_thickness", 0.3)
@@ -477,6 +543,18 @@ def build_connector(spec, con, flex_z0, flex_z1, mats):
             fb, ft, fs = box(bm, fa, -pad_w / 2, floor_h - 0.01, fb2, pad_w / 2, floor_h + 0.06)
             gold += [fb, ft] + fs
 
+    if con.get("cap", True):
+        # metal shield plate on the far side of the flex pad (what you see from the label side
+        # when the plug faces the board): sits on top of the pad, so offset by the pad thickness
+        cap_t = 0.14
+        off = flex_z1 - flex_z0
+        cpoly = rounded_rect(0, 0, L + 2 * skirt, W + 2 * skirt, 0.35)
+        fb, ft, fs = prism(bm, cpoly, -off - cap_t, -off)
+        metal += [fb, ft] + fs
+        # small notch mark on the plate (polarity key)
+        fb, ft, fs = box(bm, L / 2 - 0.55, -0.18, -off - cap_t - 0.03, L / 2 - 0.25, 0.18, -off - cap_t)
+        plastic += [fb, ft] + fs
+
     set_material(plastic, 0)
     set_material(metal, 1)
     set_material(gold, 2)
@@ -536,8 +614,13 @@ def write_uv_templates(spec, cell_poly, bb, out_dir, px_long=2048):
         d.line(pts + [pts[0]], fill=(255, 255, 255), width=3)
         # flex exits, so the texture author knows where the flexes are
         for fx in spec.get("flexes", []):
-            fp = [to_px(x, y) for x, y in fx["polygon"]]
+            fpoly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fx["polygon"]
+            fp = [to_px(x, y) for x, y in fpoly]
             d.line(fp + [fp[0]], fill=(120, 120, 120), width=2)
+            if fx.get("pad"):
+                pc, ps = fx["pad"]["center"], fx["pad"]["size"]
+                pp = [to_px(x, y) for x, y in rounded_rect(pc[0], pc[1], ps[0], ps[1], 0.4, fx["pad"].get("rotation_deg", 0))]
+                d.line(pp + [pp[0]], fill=(120, 120, 120), width=2)
         for lip in spec.get("seal_lips", []) + spec.get("side_wraps", []):
             lx0, ly0, lx1, ly1 = lip["rect"]
             lp = [to_px(lx0, ly0), to_px(lx1, ly0), to_px(lx1, ly1), to_px(lx0, ly1)]
@@ -549,7 +632,7 @@ def write_uv_templates(spec, cell_poly, bb, out_dir, px_long=2048):
         im.save(os.path.join(out_dir, "uv_template_%s.png" % side))
     # flexes: planar bbox UV
     for fx in spec.get("flexes", []):
-        poly = fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
+        poly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
         fx0, fy0, fx1, fy1 = poly_bbox(poly)
         fw, fh = fx1 - fx0, fy1 - fy0
         scale = 1024 / max(fw, fh)
@@ -617,7 +700,12 @@ def parts_bbox(spec, bb):
     """2D bbox (mm) of cell + flexes, used to frame the camera."""
     x0, y0, x1, y1 = bb
     for fx in spec.get("flexes", []):
-        fx0, fy0, fx1, fy1 = poly_bbox(fx["polygon"])
+        pts = list(fx.get("path", fx.get("polygon", [])))
+        if fx.get("pad"):
+            pc, ps = fx["pad"]["center"], fx["pad"]["size"]
+            m = max(ps) / 2
+            pts += [(pc[0] - m, pc[1] - m), (pc[0] + m, pc[1] + m)]
+        fx0, fy0, fx1, fy1 = poly_bbox(pts)
         x0, y0, x1, y1 = min(x0, fx0), min(y0, fy0), max(x1, fx1), max(y1, fy1)
     for lip in spec.get("seal_lips", []) + spec.get("side_wraps", []):
         lx0, ly0, lx1, ly1 = lip["rect"]
@@ -690,7 +778,7 @@ def render_views(spec, bb, out_dir, samples, quick=False, only=None, suffix=""):
                 continue
             cam_data.lens = 100
             sc.render.resolution_x, sc.render.resolution_y = int(1400 * scale), int(1000 * scale)
-            camera_look_at(cam, t, 0.028, d)
+            camera_look_at(cam, t, 0.022, d)
             sc.render.filepath = os.path.join(out_dir, "preview_%s_%s%s.png" % (con["name"].lower(), side, suffix))
             bpy.ops.render.render(write_still=True)
 
