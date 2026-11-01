@@ -162,6 +162,21 @@ def new_object(name, bm, materials, scale=MM):
     return ob
 
 
+def set_area_weighted_normals(me):
+    """Smooth shading with face-area-weighted vertex normals (same idea as the Weighted Normal
+    modifier): the big flat faces dominate, so their boundary normals stay (0,0,+-1) and the
+    n-gon interior shades evenly; the bevel still blends smoothly into the sides."""
+    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
+    acc = [Vector((0.0, 0.0, 0.0)) for _ in me.vertices]
+    for p in me.polygons:
+        n = p.normal * p.area
+        for vi in p.vertices:
+            acc[vi] += n
+    normals = [v.normalized() if v.length > 0 else Vector((0, 0, 1)) for v in acc]
+    me.normals_split_custom_set_from_vertices(normals)
+    me.update()
+
+
 def mark_sharp_edges(me, angle_deg=35.0):
     """Smooth faces + sharp edges where the dihedral angle is large (works without auto-smooth)."""
     bm = bmesh.new()
@@ -249,6 +264,7 @@ def materials():
         "Cell_Front": make_material("Cell_Front", (0.012, 0.012, 0.013), 0.42, sheen=0.1),
         "Cell_Back": make_material("Cell_Back", (0.012, 0.012, 0.013), 0.42, sheen=0.1),
         "Cell_Side": make_material("Cell_Side", (0.010, 0.010, 0.011), 0.55),
+        "Cell_Seal": make_material("Cell_Seal", (0.014, 0.014, 0.015), 0.6),
         "Flex": make_material("Flex", (0.020, 0.012, 0.008), 0.38),
         "Stiffener": make_material("Stiffener", (0.008, 0.008, 0.008), 0.6),
         "Connector_Plastic": make_material("Connector_Plastic", (0.015, 0.014, 0.013), 0.65),
@@ -281,9 +297,11 @@ def build_cell(spec, mats):
     front, back, side = [], [], []
     for f in bm.faces:
         nz = f.normal.z
-        if nz > 0.45:
+        # the whole bevel belongs to front/back (planar texture runs over the edge),
+        # only the vertical band is Cell_Side -> no material seam on the slope
+        if nz > 0.02:
             front.append(f)
-        elif nz < -0.45:
+        elif nz < -0.02:
             back.append(f)
         else:
             side.append(f)
@@ -304,8 +322,52 @@ def build_cell(spec, mats):
             l[uv].uv = (u, l.vert.co.z / T)
 
     ob = new_object("Cell", bm, [mats["Cell_Front"], mats["Cell_Back"], mats["Cell_Side"]])
-    mark_sharp_edges(ob.data, 35.0)
+    set_area_weighted_normals(ob.data)
     return ob, poly, bb
+
+
+def build_seal_lips(spec, mats):
+    """Flat laminate seal lips of the pouch (where the cell tabs exit); the flexes sit on top of them."""
+    objs = []
+    t = spec.get("seal_thickness", 0.3)
+    zc = spec["thickness"] / 2.0
+    for lip in spec.get("seal_lips", []):
+        x0, y0, x1, y1 = lip["rect"]
+        poly = fillet_polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], lip.get("fillets", [0.3] * 4))
+        bm = bmesh.new()
+        prism(bm, poly, zc - t / 2.0, zc + t / 2.0)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        uv = bm.loops.layers.uv.new("UVMap")
+        planar_uv(bm, uv, list(bm.faces), (x0, y0, x1, y1))
+        ob = new_object(lip["name"], bm, [mats["Cell_Seal"]])
+        mark_sharp_edges(ob.data, 35.0)
+        objs.append(ob)
+    return objs
+
+
+def build_side_wraps(spec, mats):
+    """Taped side-seal folds: rounded dark ribs hugging an outer edge, slightly thicker than the cell."""
+    objs = []
+    T = spec["thickness"]
+    for w in spec.get("side_wraps", []):
+        x0, y0, x1, y1 = w["rect"]
+        ex = w.get("extra_thickness", 0.25)
+        poly = fillet_polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], w.get("fillets", [1.0] * 4))
+        bm = bmesh.new()
+        prism(bm, poly, -ex / 2.0, T + ex / 2.0)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bev = w.get("bevel", {"offset": 1.2, "segments": 4})
+        edges = [e for e in bm.edges
+                 if all(abs(v.co.z + ex / 2.0) < 1e-6 for v in e.verts) or all(abs(v.co.z - T - ex / 2.0) < 1e-6 for v in e.verts)]
+        bmesh.ops.bevel(bm, geom=edges, offset=bev["offset"], segments=bev.get("segments", 4),
+                        profile=0.5, affect="EDGES", clamp_overlap=True)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        uv = bm.loops.layers.uv.new("UVMap")
+        planar_uv(bm, uv, list(bm.faces), (x0, y0, x1, y1))
+        ob = new_object(w["name"], bm, [mats["Cell_Seal"]])
+        set_area_weighted_normals(ob.data)
+        objs.append(ob)
+    return objs
 
 
 def build_flex(spec, fx, mats):
@@ -476,6 +538,10 @@ def write_uv_templates(spec, cell_poly, bb, out_dir, px_long=2048):
         for fx in spec.get("flexes", []):
             fp = [to_px(x, y) for x, y in fx["polygon"]]
             d.line(fp + [fp[0]], fill=(120, 120, 120), width=2)
+        for lip in spec.get("seal_lips", []) + spec.get("side_wraps", []):
+            lx0, ly0, lx1, ly1 = lip["rect"]
+            lp = [to_px(lx0, ly0), to_px(lx1, ly0), to_px(lx1, ly1), to_px(lx0, ly1)]
+            d.line(lp + [lp[0]], fill=(90, 90, 90), width=2)
         label = "%s  %s  %.1f x %.1f mm  (%d x %d px)" % (spec["name"], side.upper(), w_mm, h_mm, W, H)
         d.text((12, 12), label, fill=(255, 255, 255))
         d.text((12, 28), "UV: u = x/width, v = y/height" + ("  (mirrored for the back)" if side == "back" else ""),
@@ -553,6 +619,9 @@ def parts_bbox(spec, bb):
     for fx in spec.get("flexes", []):
         fx0, fy0, fx1, fy1 = poly_bbox(fx["polygon"])
         x0, y0, x1, y1 = min(x0, fx0), min(y0, fy0), max(x1, fx1), max(y1, fy1)
+    for lip in spec.get("seal_lips", []) + spec.get("side_wraps", []):
+        lx0, ly0, lx1, ly1 = lip["rect"]
+        x0, y0, x1, y1 = min(x0, lx0), min(y0, ly0), max(x1, lx1), max(y1, ly1)
     return x0, y0, x1, y1
 
 
@@ -637,6 +706,7 @@ def main():
     ap.add_argument("--quick", action="store_true", help="small, noisy preview renders")
     ap.add_argument("--views", default="", help="comma list: front,back,three_quarter,connectors,connector_main_back,...")
     ap.add_argument("--uvcheck", action="store_true", help="also render front/back with the UV templates as textures")
+    ap.add_argument("--gloss", action="store_true", help="render the cell with a light glossy material to inspect shading")
     args = ap.parse_args()
 
     with open(args.spec, "r", encoding="utf-8") as f:
@@ -648,6 +718,8 @@ def main():
     mats = materials()
     cell, cell_poly, bb = build_cell(spec, mats)
     parts = [cell]
+    parts += build_seal_lips(spec, mats)
+    parts += build_side_wraps(spec, mats)
     for fx in spec.get("flexes", []):
         parts += build_flex(spec, fx, mats)
 
@@ -674,6 +746,11 @@ def main():
 
     if args.render:
         only = [v for v in args.views.split(",") if v] or None
+        if args.gloss:
+            for mn in ("Cell_Front", "Cell_Back", "Cell_Side"):
+                bsdf = mats[mn].node_tree.nodes.get("Principled BSDF")
+                bsdf.inputs["Base Color"].default_value = (0.5, 0.5, 0.5, 1)
+                bsdf.inputs["Roughness"].default_value = 0.2
         smp = args.samples if not args.quick else min(args.samples, 24)
         render_views(spec, bb, out_dir, smp, args.quick, only)
         if args.uvcheck:
