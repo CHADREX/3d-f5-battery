@@ -19,7 +19,7 @@
     "upper_width": 38.6,
     "lower_height": 43.5,
     "outer_radius": 1.6,
-    "inner_radius": 3.5
+    "inner_radius": 2.0
   },
   "edge_bevel": {
     "offset": 1.1,
@@ -30,140 +30,178 @@
     "seal_band_top_mm": 3.0,
     "seal_band_bottom_mm": 0.0
   },
-  "flex_thickness": 0.15,
+  "flex_thickness": 0.12,
   "flex_z": 2.5,
   "stiffener_thickness": 0.3,
   "connector_side": "back",
   "flexes": [
     {
       "name": "Flex_Main",
-      "_note": "thin strip out of the step seal at the inner corner: U-shaped strain-relief loop, short run right along the step, then up to the plug pad",
-      "width": 1.3,
-      "path": [
+      "spline": true,
+      "_note": "thin strip (~0.5 mm) out of the step seal at the inner corner: hairpin loop opening to the right, then diagonal up-right into the black tab; points = [x, y, z, width]",
+      "thickness": 0.12,
+      "points": [
         [
-          39.6,
-          43.0
+          42.1,
+          43.35,
+          2.56,
+          0.5
         ],
         [
-          39.6,
-          46.6
+          41.1,
+          43.45,
+          2.56,
+          0.5
         ],
         [
-          41.9,
-          46.6
+          40.3,
+          43.95,
+          2.57,
+          0.5
         ],
         [
-          41.9,
-          44.8
+          40.7,
+          44.55,
+          2.58,
+          0.5
         ],
         [
-          45.6,
-          44.8
+          41.6,
+          44.7,
+          2.6,
+          0.5
         ],
         [
-          45.6,
-          49.3
+          42.6,
+          45.0,
+          2.63,
+          0.6
+        ],
+        [
+          43.4,
+          45.5,
+          2.68,
+          0.9
+        ],
+        [
+          43.9,
+          46.0,
+          2.7,
+          1.2
         ]
       ],
-      "radii": [
-        0,
-        1.0,
-        0.9,
-        0.9,
-        1.0,
-        0
-      ],
-      "pad": {
+      "tab": {
         "center": [
-          45.6,
-          50.9
+          43.35,
+          46.25
         ],
         "size": [
-          3.3,
-          3.7
+          4.1,
+          3.1
         ],
         "radius": 0.5,
-        "rotation_deg": 0
+        "rotation_deg": 10,
+        "z": 2.7,
+        "thickness": 0.22
       },
       "connector": {
         "name": "Connector_Main",
         "center": [
-          45.6,
-          50.9
+          43.1,
+          46.5
         ],
         "size": [
-          3.1,
-          2.5,
+          3.4,
+          2.2,
           0.5
         ],
-        "rotation_deg": 90,
-        "pins_per_row": 4,
+        "rotation_deg": 10,
+        "pins_per_row": 5,
         "power_pads": true
       }
     },
     {
       "name": "Flex_Lower",
-      "_note": "thin strip out of the bottom seal: J-loop, short run right under the edge, plug pad hanging below",
-      "width": 1.3,
-      "path": [
+      "spline": true,
+      "_note": "thin strip out of the bottom seal ~33 mm from the left: hairpin loop opening to the right, short run right just under the edge, into the black tab",
+      "thickness": 0.12,
+      "points": [
         [
-          32.4,
+          33.3,
+          0.35,
+          2.56,
+          0.45
+        ],
+        [
+          33.05,
+          -0.5,
+          2.56,
+          0.45
+        ],
+        [
+          32.45,
+          -1.15,
+          2.57,
+          0.45
+        ],
+        [
+          32.75,
+          -1.8,
+          2.58,
+          0.45
+        ],
+        [
+          33.6,
+          -1.75,
+          2.6,
+          0.45
+        ],
+        [
+          34.7,
+          -1.55,
+          2.63,
+          0.5
+        ],
+        [
+          35.6,
+          -1.5,
+          2.67,
           0.8
         ],
         [
-          32.4,
-          -2.8
-        ],
-        [
-          34.4,
-          -2.8
-        ],
-        [
-          34.4,
-          -1.4
-        ],
-        [
-          38.3,
-          -1.4
-        ],
-        [
-          38.3,
-          -2.4
+          36.2,
+          -1.75,
+          2.7,
+          1.1
         ]
       ],
-      "radii": [
-        0,
-        1.0,
-        0.9,
-        0.9,
-        0.9,
-        0
-      ],
-      "pad": {
+      "tab": {
         "center": [
-          38.3,
-          -3.9
+          36.9,
+          -2.5
         ],
         "size": [
-          4.0,
-          3.2
+          3.8,
+          3.1
         ],
         "radius": 0.5,
-        "rotation_deg": 0
+        "rotation_deg": -3,
+        "z": 2.7,
+        "thickness": 0.22
       },
       "connector": {
         "name": "Connector_Lower",
         "center": [
-          38.3,
-          -3.9
+          36.8,
+          -2.45
         ],
         "size": [
-          3.3,
-          2.5,
+          3.4,
+          2.2,
           0.5
         ],
-        "rotation_deg": 0,
-        "pins_per_row": 4,
+        "rotation_deg": -3,
+        "pins_per_row": 5,
         "power_pads": true
       }
     }
@@ -179,10 +217,10 @@
       "name": "Seal_Step",
       "_note": "flat laminate seal along the L step edge; the main flex comes out of it",
       "rect": [
-        41.0,
+        38.9,
         43.3,
         63.9,
-        44.9
+        44.6
       ]
     },
     {
@@ -190,7 +228,7 @@
       "_note": "flat laminate seal along the bottom edge; the lower flex comes out of it",
       "rect": [
         0.7,
-        -1.3,
+        -1.1,
         63.9,
         0.4
       ]

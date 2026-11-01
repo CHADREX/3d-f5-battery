@@ -321,6 +321,8 @@ def build_cell(spec, mats):
         for l, u in zip(f.loops, us):
             l[uv].uv = (u, l.vert.co.z / T)
 
+    ngons = [f for f in bm.faces if len(f.verts) > 4]
+    bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="BEAUTY")
     ob = new_object("Cell", bm, [mats["Cell_Front"], mats["Cell_Back"], mats["Cell_Side"]])
     set_area_weighted_normals(ob.data)
     return ob, poly, bb
@@ -364,6 +366,8 @@ def build_side_wraps(spec, mats):
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         uv = bm.loops.layers.uv.new("UVMap")
         planar_uv(bm, uv, list(bm.faces), (x0, y0, x1, y1))
+        ngons = [f for f in bm.faces if len(f.verts) > 4]
+        bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="BEAUTY")
         ob = new_object(w["name"], bm, [mats["Cell_Seal"]])
         set_area_weighted_normals(ob.data)
         objs.append(ob)
@@ -410,6 +414,77 @@ def ribbon_polygon(path, radii, width, seg_per_90=8):
     return poly
 
 
+def catmull_rom(points, samples_per_seg=14, alpha=0.5):
+    """Centripetal Catmull-Rom through all points (any dimension, mathutils Vector). Returns samples."""
+    P = [Vector(p) for p in points]
+    if len(P) < 2:
+        return P
+    P = [P[0] + (P[0] - P[1])] + P + [P[-1] + (P[-1] - P[-2])]
+    out = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+
+        def tj(ti, pa, pb):
+            return ti + max((pb - pa).length, 1e-6) ** alpha
+
+        t0 = 0.0
+        t1 = tj(t0, p0, p1)
+        t2 = tj(t1, p1, p2)
+        t3 = tj(t2, p2, p3)
+        n = samples_per_seg
+        for k in range(n):
+            t = t1 + (t2 - t1) * k / n
+            a1 = p0 * ((t1 - t) / (t1 - t0)) + p1 * ((t - t0) / (t1 - t0))
+            a2 = p1 * ((t2 - t) / (t2 - t1)) + p2 * ((t - t1) / (t2 - t1))
+            a3 = p2 * ((t3 - t) / (t3 - t2)) + p3 * ((t - t2) / (t3 - t2))
+            b1 = a1 * ((t2 - t) / (t2 - t0)) + a2 * ((t - t0) / (t2 - t0))
+            b2 = a2 * ((t3 - t) / (t3 - t1)) + a3 * ((t - t1) / (t3 - t1))
+            out.append(b1 * ((t2 - t) / (t2 - t1)) + b2 * ((t - t1) / (t2 - t1)))
+    out.append(P[-2])
+    return out
+
+
+def spline_ribbon(bm, points, thickness, samples_per_seg=14):
+    """Solid flat ribbon following a smooth 3D centreline with per-point width.
+    points: [(x, y, z, width), ...] in mm. The ribbon normal stays +Z (it bends only in plane
+    and may rise/fall along Z), like a real polyimide strip lying on the cell."""
+    S = catmull_rom([Vector((x, y, z, w)) for x, y, z, w in points], samples_per_seg)
+    # drop near-duplicate samples
+    C = [S[0]]
+    for q in S[1:]:
+        if (q.xyz - C[-1].xyz).length > 1e-4:
+            C.append(q)
+    n = len(C)
+    up = Vector((0, 0, 1))
+    rings = []
+    for i in range(n):
+        if i == 0:
+            t = C[1].xyz - C[0].xyz
+        elif i == n - 1:
+            t = C[-1].xyz - C[-2].xyz
+        else:
+            t = C[i + 1].xyz - C[i - 1].xyz
+        t = t.normalized()
+        side = t.cross(up)
+        if side.length < 1e-6:
+            side = Vector((1, 0, 0))
+        side = side.normalized()
+        nrm = side.cross(t).normalized()  # local "up" of the ribbon (perpendicular to t, close to +Z)
+        c = C[i].xyz
+        w = C[i].w
+        h = thickness / 2.0
+        rings.append([bm.verts.new(c + side * (w / 2) + nrm * h), bm.verts.new(c - side * (w / 2) + nrm * h),
+                      bm.verts.new(c - side * (w / 2) - nrm * h), bm.verts.new(c + side * (w / 2) - nrm * h)])
+    faces = []
+    for i in range(n - 1):
+        a, b = rings[i], rings[i + 1]
+        for k in range(4):
+            faces.append(bm.faces.new([a[k], b[k], b[(k + 1) % 4], a[(k + 1) % 4]]))
+    faces.append(bm.faces.new(list(reversed(rings[0]))))
+    faces.append(bm.faces.new(rings[-1]))
+    return faces
+
+
 def rounded_rect(cx, cy, w, h, r, rot_deg=0.0):
     pts = [(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)]
     poly = fillet_polygon(pts, [min(r, w / 2 - 0.01, h / 2 - 0.01)] * 4)
@@ -418,7 +493,47 @@ def rounded_rect(cx, cy, w, h, r, rot_deg=0.0):
     return [(cx + x * ca - y * sa, cy + x * sa + y * ca) for x, y in poly]
 
 
+def build_flex_spline(spec, fx, mats):
+    """Natural flex: thin strip on a smooth 3D spline + black polyimide tab + plug with metal plate."""
+    t = fx.get("thickness", spec.get("flex_thickness", 0.12))
+    pts = fx["points"]
+    bm = bmesh.new()
+    spline_ribbon(bm, pts, t, fx.get("samples_per_seg", 14))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uv = bm.loops.layers.uv.new("UVMap")
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    box_uv(bm, uv, list(bm.faces), (min(xs) - 1, min(ys) - 1, 0, max(xs) + 1, max(ys) + 1, spec["thickness"]))
+    ob = new_object(fx["name"], bm, [mats["Flex"]])
+    set_area_weighted_normals(ob.data)
+    objs = [ob]
+
+    tab = fx.get("tab")
+    if not tab:
+        return objs
+    tcx, tcy = tab["center"]
+    tw, th = tab["size"]
+    tz = tab.get("z", pts[-1][2])
+    tt = tab.get("thickness", 0.22)
+    tpoly = rounded_rect(tcx, tcy, tw, th, tab.get("radius", 0.45), tab.get("rotation_deg", 0))
+    bm = bmesh.new()
+    prism(bm, tpoly, tz - tt / 2.0, tz + tt / 2.0)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    uv = bm.loops.layers.uv.new("UVMap")
+    planar_uv(bm, uv, list(bm.faces), poly_bbox(tpoly))
+    po = new_object(fx["name"].replace("Flex", "Pad"), bm, [mats["Stiffener"]])
+    mark_sharp_edges(po.data, 35.0)
+    objs.append(po)
+
+    con = fx.get("connector")
+    if con:
+        objs.append(build_connector(spec, con, tz - tt / 2.0, tz + tt / 2.0, mats))
+    return objs
+
+
 def build_flex(spec, fx, mats):
+    if fx.get("spline"):
+        return build_flex_spline(spec, fx, mats)
     if "path" in fx:
         poly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2))
     else:
@@ -614,12 +729,18 @@ def write_uv_templates(spec, cell_poly, bb, out_dir, px_long=2048):
         d.line(pts + [pts[0]], fill=(255, 255, 255), width=3)
         # flex exits, so the texture author knows where the flexes are
         for fx in spec.get("flexes", []):
-            fpoly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fx["polygon"]
-            fp = [to_px(x, y) for x, y in fpoly]
-            d.line(fp + [fp[0]], fill=(120, 120, 120), width=2)
-            if fx.get("pad"):
-                pc, ps = fx["pad"]["center"], fx["pad"]["size"]
-                pp = [to_px(x, y) for x, y in rounded_rect(pc[0], pc[1], ps[0], ps[1], 0.4, fx["pad"].get("rotation_deg", 0))]
+            if fx.get("spline"):
+                cl = [to_px(q.x, q.y) for q in catmull_rom([Vector(p[:2]) for p in fx["points"]])]
+                d.line(cl, fill=(120, 120, 120), width=2)
+                tabd = fx.get("tab")
+            else:
+                fpoly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fx["polygon"]
+                fp = [to_px(x, y) for x, y in fpoly]
+                d.line(fp + [fp[0]], fill=(120, 120, 120), width=2)
+                tabd = fx.get("pad")
+            if tabd:
+                pc, ps = tabd["center"], tabd["size"]
+                pp = [to_px(x, y) for x, y in rounded_rect(pc[0], pc[1], ps[0], ps[1], 0.4, tabd.get("rotation_deg", 0))]
                 d.line(pp + [pp[0]], fill=(120, 120, 120), width=2)
         for lip in spec.get("seal_lips", []) + spec.get("side_wraps", []):
             lx0, ly0, lx1, ly1 = lip["rect"]
@@ -632,7 +753,10 @@ def write_uv_templates(spec, cell_poly, bb, out_dir, px_long=2048):
         im.save(os.path.join(out_dir, "uv_template_%s.png" % side))
     # flexes: planar bbox UV
     for fx in spec.get("flexes", []):
-        poly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
+        if fx.get("spline"):
+            poly = [p[:2] for p in fx["points"]]
+        else:
+            poly = ribbon_polygon(fx["path"], fx.get("radii", [0] * len(fx["path"])), fx.get("width", 1.2)) if "path" in fx else fillet_polygon(fx["polygon"], fx.get("fillets", [0] * len(fx["polygon"])))
         fx0, fy0, fx1, fy1 = poly_bbox(poly)
         fw, fh = fx1 - fx0, fy1 - fy0
         scale = 1024 / max(fw, fh)
@@ -700,9 +824,10 @@ def parts_bbox(spec, bb):
     """2D bbox (mm) of cell + flexes, used to frame the camera."""
     x0, y0, x1, y1 = bb
     for fx in spec.get("flexes", []):
-        pts = list(fx.get("path", fx.get("polygon", [])))
-        if fx.get("pad"):
-            pc, ps = fx["pad"]["center"], fx["pad"]["size"]
+        pts = [p[:2] for p in fx.get("points", fx.get("path", fx.get("polygon", [])))]
+        tabd = fx.get("tab") or fx.get("pad")
+        if tabd:
+            pc, ps = tabd["center"], tabd["size"]
             m = max(ps) / 2
             pts += [(pc[0] - m, pc[1] - m), (pc[0] + m, pc[1] + m)]
         fx0, fy0, fx1, fy1 = poly_bbox(pts)
